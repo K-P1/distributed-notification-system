@@ -106,13 +106,6 @@ Using `uv` (recommended):
 uv sync
 ```
 
-Or using pip:
-
-```bash
-pip install -r requirements.txt
-pip install -r requirements-dev.txt  # For development
-```
-
 ### 3. Set Up Environment
 
 ```bash
