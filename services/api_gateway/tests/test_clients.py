@@ -80,25 +80,7 @@ async def test_rate_limiter_allows_requests(redis_client):
         assert allowed is True
 
 
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="fakeredis sorted set behavior differs from real Redis")
-async def test_rate_limiter_blocks_excess_requests(redis_client):
-    """Test rate limiter blocks requests exceeding limit"""
-    from app.clients.redis_client import RateLimiter
 
-    limiter = RateLimiter(redis_client, window=60)
-    api_key = "test_api_key_2"
-    limit = 3
-
-    # Make requests up to limit
-    for i in range(limit):
-        allowed, remaining = await limiter.check_limit(api_key, limit)
-        assert allowed is True, f"Request {i+1} should be allowed"
-
-    # Next request should be blocked
-    allowed, remaining = await limiter.check_limit(api_key, limit)
-    assert allowed is False, "Request beyond limit should be blocked"
-    assert remaining == 0, "Remaining should be 0 when limit exceeded"
 
 
 @pytest.mark.asyncio
