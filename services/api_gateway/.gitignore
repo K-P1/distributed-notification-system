@@ -1,1 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environments
+.venv/
+
+# Local data
+*.db
+app.db
+dev.db
+test.db
+
+# Secrets
+.env
+
+# Packaging
+*.egg-info/
+
+# Editors/OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# # alembic
+# alembic/versions/*
+# !alembic/versions/.gitkeep
+
+# personal files
 docs/
+*.log
