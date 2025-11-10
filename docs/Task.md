@@ -57,6 +57,75 @@ Exchange: notifications.direct
 └── failed.queue → Dead Letter Queue
 ```
 
+## Request Formats
+
+### Send Notification (API Gateway)
+```http
+POST /api/v1/notifications/
+Content-Type: application/json
+
+{
+  "notification_type": NotificationType,
+  "user_id": "uuid",
+  "template_code": "str | path",
+  "variables": UserData,
+  "request_id": "str",
+  "priority": "int",
+  "metadata": Optional[dict]
+}
+```
+
+```python
+class NotificationType(str, Enum):
+    email = "email"
+    push = "push"
+
+class UserData:
+    name: str
+    link: HttpUrl
+    meta: Optional[dict]
+```
+
+### Create User (User Service)
+```http
+POST /api/v1/users/
+Content-Type: application/json
+
+{
+  "name": str,
+  "email": Email,
+  "push_token": Optional[str],  # can be updated with an update endpoint
+  "preferences": UserPreference,
+  "password": str
+}
+```
+
+```python
+class UserPreference:
+    email: bool
+    push: bool
+```
+
+### Update Notification Status (Email/Push Service → API Gateway)
+```http
+POST /api/v1/{notification_preference}/status/
+Content-Type: application/json
+
+{
+  "notification_id": str,
+  "status": NotificationStatus,
+  "timestamp": Optional[datetime],
+  "error": Optional[str]
+}
+```
+
+```python
+class NotificationStatus(str, Enum):
+    delivered = "delivered"
+    pending = "pending"
+    failed = "failed"
+```
+
 ## Response format
 ```json
 {
