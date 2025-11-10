@@ -1,26 +1,87 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    container_name: rabbitmq
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
     ports:
-      - "5672:5672"  # AMQP
-      - "15672:15672"  # Management UI
+      - "5432:5432"
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      POSTGRES_USER: gateway_user
+      POSTGRES_PASSWORD: gatewaypassword
+      POSTGRES_DB: gateway_db
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: redis
+    command: redis-server --requirepass redispassword
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672" # AMQP
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: secretpassword
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Gateway Service
+  api-gateway:
+    build:
+      context: ../services/api_gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+      - "9090:9090"
+    environment:
+      - RABBITMQ_URL=amqp://admin:secretpassword@rabbitmq:5672/
+      - RABBITMQ_MGMT_URL=http://rabbitmq:15672
+      - USER_SERVICE_URL=http://user-service:8001
+      - TEMPLATE_SERVICE_URL=http://template-service:8002
+      - REDIS_URL=redis://:redispassword@redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://gateway_user:gatewaypassword@postgres:5432/gateway_db
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ../services/api_gateway/app:/app/app
 
 volumes:
-  rabbitmq_data:
+  postgres_data:
   redis_data:
+  rabbitmq_data:
