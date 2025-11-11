@@ -1,0 +1,45 @@
+services:
+  # Email Service
+  email-service:
+    build:
+      context: ./services/email-service
+      dockerfile: Dockerfile
+    container_name: email-service
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - RABBITMQ_URL=amqp://admin:secretpassword@host.docker.internal:5672/
+      - REDIS_URL=redis://:redispassword@host.docker.internal:6379/0
+      - API_GATEWAY_URL=http://api-gateway:8000
+      - TEMPLATE_SERVICE_URL=http://template-service:3002
+      - LOG_LEVEL=debug
+      - SMTP_HOST=smtp.mailtrap.io
+      - SMTP_PORT=587
+      - SMTP_USER=test
+      - SMTP_PASSWORD=test
+      - FROM_EMAIL=noreply@example.com
+    restart: unless-stopped
+    network_mode: bridge
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Template Service
+  template-service:
+    build:
+      context: ./services/template-service
+      dockerfile: Dockerfile
+    container_name: template-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://gateway_user:gatewaypassword@host.docker.internal:5432/gateway_db
+      - REDIS_URL=redis://:redispassword@host.docker.internal:6379/1
+      - LOG_LEVEL=debug
+    restart: unless-stopped
+    network_mode: bridge
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

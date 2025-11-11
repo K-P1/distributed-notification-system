@@ -1,3 +1,10 @@
 {
-  "postman.settings.dotenv-detection-notification-visibility": false
+  "postman.settings.dotenv-detection-notification-visibility": false,
+  "typescript.preferences.maxTsServerMemory": 8192,
+  "typescript.tsc.autoDetect": "off",
+  "typescript.preferences.includePackageJsonAutoImports": "off",
+  "typescript.suggest.autoImports": false,
+  "typescript.preferences.enableRenameShorthandProperties": false,
+  "typescript.format.enable": false,
+  "typescript.validate.enable": true
 }

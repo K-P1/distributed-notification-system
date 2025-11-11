@@ -1,0 +1,34 @@
+import { ConfigService } from '@nestjs/config';
+export declare class AppConfigService {
+    private configService;
+    constructor(configService: ConfigService);
+    get port(): number;
+    get environment(): string;
+    get rabbitmqUrl(): string;
+    get emailQueueName(): string;
+    get exchangeName(): string;
+    get deadLetterExchange(): string;
+    get failedQueueName(): string;
+    get smtpHost(): string;
+    get smtpPort(): number;
+    get smtpUser(): string;
+    get smtpPassword(): string;
+    get smtpSecure(): boolean;
+    get fromEmail(): string;
+    get fromName(): string;
+    get redisUrl(): string;
+    get circuitBreakerThreshold(): number;
+    get circuitBreakerTimeout(): number;
+    get maxRetries(): number;
+    get retryDelayMs(): number;
+    get exponentialBackoff(): boolean;
+    get apiGatewayUrl(): string;
+    get apiGatewayTimeout(): number;
+    get logLevel(): string;
+    get enableJsonLogging(): boolean;
+    get templateServiceUrl(): string;
+    get templateServiceTimeout(): number;
+    get healthCheckInterval(): number;
+    get metricsPort(): number;
+    get enableMetrics(): boolean;
+}
