@@ -1,0 +1,35 @@
+{
+  "name": "user-service",
+  "version": "0.1.1",
+  "description": "User service for handling user management, authentication, and preferences.",
+  "scripts": {
+    "dev": "bun run --hot src/server.ts",
+    "start": "bun src/server.ts",
+    "release": "standard-version",
+    "db:generate": "bunx drizzle-kit generate",
+    "db:migrate": "bunx drizzle-kit migrate",
+    "db:push": "bunx drizzle-kit push"
+  },
+  "dependencies": {
+    "@hono/swagger-ui": "^0.5.2",
+    "@hono/zod-validator": "^0.7.4",
+    "@scalar/hono-api-reference": "^0.9.24",
+    "amqplib": "^0.10.9",
+    "drizzle-orm": "^0.44.7",
+    "hono": "^4.10.4",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.8",
+    "@types/bun": "latest",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/pg": "^8.15.6",
+    "drizzle-kit": "^0.31.6",
+    "standard-version": "^9.5.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
