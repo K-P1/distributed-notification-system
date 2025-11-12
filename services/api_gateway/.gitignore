@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environments
+.venv/
+
+# Local data
+*.db
+app.db
+dev.db
+test.db
+
+# Secrets
+.env.Local
+.env.docker
+.env
+
+.vscode/
+.DS_Store
+Thumbs.db
+
+*.egg-info/
+
+# # alembic
+# alembic/versions/*
+# !alembic/versions/.gitkeep
+
+# personal files
+*.log
+docs/
+
+.vscode/
+.idea/

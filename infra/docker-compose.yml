@@ -1,0 +1,231 @@
+version: "3.8"
+
+services:
+  # ------------------------------------------------------------------
+  # PostgreSQL Database - API Gateway
+  # ------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: gateway_user
+      POSTGRES_PASSWORD: gatewaypassword
+      POSTGRES_DB: gateway_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # PostgreSQL Database - User Service
+  # ------------------------------------------------------------------
+  postgres-user:
+    image: postgres:15-alpine
+    container_name: postgres-user
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: user_svc
+      POSTGRES_PASSWORD: userpassword
+      POSTGRES_DB: user_db
+    volumes:
+      - postgres_user_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_svc"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # PostgreSQL Database - Template Service
+  # ------------------------------------------------------------------
+  postgres-template:
+    image: postgres:15-alpine
+    container_name: postgres-template
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_USER: template_svc
+      POSTGRES_PASSWORD: templatepassword
+      POSTGRES_DB: template_db
+    volumes:
+      - postgres_template_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U template_svc"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # Redis Cache
+  # ------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --requirepass redispassword
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # RabbitMQ Message Broker
+  # ------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672" # AMQP
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: secretpassword
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # API Gateway Service (Docker mode)
+  # ------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ../services/api_gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+      - "9090:9090"
+    env_file:
+      - ../services/api_gateway/.env.docker # <-- Docker uses this file
+    environment:
+      - ENV=docker # <-- tells app it's inside Docker
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # User Service
+  # ------------------------------------------------------------------
+  user-service:
+    build:
+      context: ../services/user
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user_svc:userpassword@postgres-user:5432/user_db
+      - VALID_API_KEYS=test,api-key-1
+      - JWT_SECRET_KEY=your-secret-key-change-in-production
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # Template Service
+  # ------------------------------------------------------------------
+  template-service:
+    build:
+      context: ../services/template
+      dockerfile: Dockerfile
+    container_name: template-service
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://template_svc:templatepassword@postgres-template:5432/template_db
+      - VALID_API_KEYS=test,api-key-1
+    depends_on:
+      postgres-template:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # Email Service
+  # ------------------------------------------------------------------
+  email:
+    build:
+      context: ../services/email
+      dockerfile: Dockerfile
+    container_name: email-service
+    environment:
+      - SERVICE_NAME=email-service
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - RABBITMQ_URL=amqp://admin:secretpassword@rabbitmq:5672/
+      - EMAIL_QUEUE_NAME=email.queue
+      - DLQ_NAME=email.dlq
+      - MAX_RETRIES=3
+      - API_GATEWAY_URL=http://api-gateway:8000
+      - API_GATEWAY_API_KEY=test-api-key
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USE_TLS=true
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-noreply@example.com}
+      - SMTP_FROM_NAME=Notification System
+      - RETRY_INITIAL_DELAY=1.0
+      - RETRY_MAX_DELAY=60.0
+      - RETRY_EXPONENTIAL_BASE=2.0
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      api-gateway:
+        condition: service_started
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # Push Service
+  # ------------------------------------------------------------------
+  push:
+    build:
+      context: ../services/push
+      dockerfile: Dockerfile
+    container_name: push-service
+    environment:
+      - SERVICE_NAME=push-service
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - RABBITMQ_URL=amqp://admin:secretpassword@rabbitmq:5672/
+      - PUSH_QUEUE_NAME=push.queue
+      - DLQ_NAME=push.dlq
+      - MAX_RETRIES=3
+      - API_GATEWAY_URL=http://api-gateway:8000
+      - API_GATEWAY_API_KEY=test-api-key
+      - FCM_SERVER_KEY=${FCM_SERVER_KEY}
+      - FCM_API_URL=https://fcm.googleapis.com/fcm/send
+      - RETRY_INITIAL_DELAY=1.0
+      - RETRY_MAX_DELAY=60.0
+      - RETRY_EXPONENTIAL_BASE=2.0
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      api-gateway:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  postgres_user_data:
+  postgres_template_data:
+  redis_data:
+  rabbitmq_data:
