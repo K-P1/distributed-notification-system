@@ -12,6 +12,7 @@ WORKDIR /app
 
 # Copy only dependency files (cache layer)
 COPY pyproject.toml ./
+COPY app ./app
 
 # Install dependencies (fallback if no extras)
 RUN pip install --no-cache-dir .
