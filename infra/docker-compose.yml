@@ -196,32 +196,26 @@ services:
   # ------------------------------------------------------------------
   # Push Service
   # ------------------------------------------------------------------
-  push:
-    build:
-      context: ../services/push
-      dockerfile: Dockerfile
-    container_name: push-service
-    environment:
-      - SERVICE_NAME=push-service
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - RABBITMQ_URL=amqp://admin:secretpassword@rabbitmq:5672/
-      - PUSH_QUEUE_NAME=push.queue
-      - DLQ_NAME=push.dlq
-      - MAX_RETRIES=3
-      - API_GATEWAY_URL=http://api-gateway:8000
-      - API_GATEWAY_API_KEY=test-api-key
-      - FCM_SERVER_KEY=${FCM_SERVER_KEY}
-      - FCM_API_URL=https://fcm.googleapis.com/fcm/send
-      - RETRY_INITIAL_DELAY=1.0
-      - RETRY_MAX_DELAY=60.0
-      - RETRY_EXPONENTIAL_BASE=2.0
+  push-service:
+    build: ../services/push_service
     depends_on:
       rabbitmq:
         condition: service_healthy
-      api-gateway:
-        condition: service_started
-    restart: unless-stopped
+      redis:
+        condition: service_healthy
+    container_name: push-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/services/push_service/app
+      - ./firebase-service-account.json:/services/push_service/app/firebase-service-account.json:ro
+    environment:
+      - RABBITMQ_HOST=amqp://admin:secretpassword@rabbitmq:5672/
+      - REDIS_HOST=redis://redis:6379/0
+      - FIREBASE_CREDENTIALS=./firebase-service-account.json
+      - PUSH_QUEUE_NAME=push.queue
+    ports:
+      - "8000:8000"
+    restart: on-failure
 
 volumes:
   postgres_data:
