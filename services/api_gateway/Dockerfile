@@ -8,16 +8,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential gcc libpq-dev curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Install uv globally
-RUN pip install --no-cache-dir uv
-
 WORKDIR /app
 
-# Copy only dependency files first
-COPY pyproject.toml uv.lock ./
+# Copy dependency files
+COPY pyproject.toml ./
 
-# Install dependencies (frozen = exact versions, no-dev = smaller image)
-RUN uv sync --frozen --no-dev
+# Install dependencies
+RUN pip install --no-cache-dir -e .
 
 # -------------------------------------
 # 🏃 Runtime image (super small)
@@ -36,10 +33,7 @@ COPY --from=builder /usr/local /usr/local
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
-COPY main.py ./
-
-# Optional: copy .env.example if you want defaults inside container
-COPY .env.example .env
+COPY .env.docker ./.env.docker
 
 # Set runtime env vars
 ENV PYTHONUNBUFFERED=1 \
@@ -47,7 +41,8 @@ ENV PYTHONUNBUFFERED=1 \
     APP_NAME=api-gateway \
     ENVIRONMENT=production \
     LOG_LEVEL=INFO \
-    PORT=8000
+    PORT=8000 \
+    ENV=docker
 
 # Expose port
 EXPOSE 8000
@@ -60,4 +55,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 USER appuser
 
 # Run with reasonable number of workers in prod
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

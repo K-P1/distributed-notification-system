@@ -108,11 +108,26 @@ services:
     container_name: api-gateway
     ports:
       - "8000:8000"
-      - "9090:9090"
-    env_file:
-      - ../services/api_gateway/.env.docker # <-- Docker uses this file
     environment:
-      - ENV=docker # <-- tells app it's inside Docker
+      - ENV=docker
+      - APP_NAME=api-gateway
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - USER_SERVICE_URL=http://user-service:3000
+      - TEMPLATE_SERVICE_URL=http://template-service:3002
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASSWORD=secretpassword
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=redispassword
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=gateway_user
+      - POSTGRES_PASSWORD=gatewaypassword
+      - POSTGRES_DB=gateway_db
+      - JWT_SECRET_KEY=your-secret-key-change-in-production-please-use-strong-random-key
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -120,23 +135,33 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      user-service:
+        condition: service_started
+      template-service:
+        condition: service_started
     restart: unless-stopped
 
   # User Service
   # ------------------------------------------------------------------
   user-service:
     build:
-      context: ../services/user
+      context: ../services/user_service
       dockerfile: Dockerfile
     container_name: user-service
     ports:
-      - "8001:8001"
+      - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://user_svc:userpassword@postgres-user:5432/user_db
-      - VALID_API_KEYS=test,api-key-1
-      - JWT_SECRET_KEY=your-secret-key-change-in-production
+      - DATABASE_URL=postgresql://user_svc:userpassword@postgres-user:5432/user_db
+      - VALID_API_KEYS=test-api-key,api-key-1
+      - JWT_SECRET=your-secret-key-change-in-production
+      - REFRESH_TOKEN_SECRET=your-refresh-secret-key-change-in-production
+      - RABBITMQ_URL=amqp://admin:secretpassword@rabbitmq:5672/
+      - PORT=3000
+      - NODE_ENV=production
     depends_on:
       postgres-user:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: unless-stopped
 
@@ -145,51 +170,72 @@ services:
   # ------------------------------------------------------------------
   template-service:
     build:
-      context: ../services/template
+      context: ../services/template-service
       dockerfile: Dockerfile
     container_name: template-service
     ports:
-      - "8002:8002"
+      - "3002:3002"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://template_svc:templatepassword@postgres-template:5432/template_db
-      - VALID_API_KEYS=test,api-key-1
+      - NODE_ENV=production
+      - PORT=3002
+      - DATABASE_URL=postgresql://template_svc:templatepassword@postgres-template:5432/template_db
+      - DB_HOST=postgres-template
+      - DB_PORT=5432
+      - DB_USER=template_svc
+      - DB_PASSWORD=templatepassword
+      - DB_NAME=template_db
+      - REDIS_URL=redis://:redispassword@redis:6379/1
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - LOG_LEVEL=info
     depends_on:
       postgres-template:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
   # ------------------------------------------------------------------
   # Email Service
   # ------------------------------------------------------------------
-  email:
+  email-service:
     build:
-      context: ../services/email
+      context: ../services/email-service
       dockerfile: Dockerfile
     container_name: email-service
+    ports:
+      - "3001:3001"
     environment:
+      - NODE_ENV=production
+      - PORT=3001
       - SERVICE_NAME=email-service
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=info
       - RABBITMQ_URL=amqp://admin:secretpassword@rabbitmq:5672/
       - EMAIL_QUEUE_NAME=email.queue
-      - DLQ_NAME=email.dlq
-      - MAX_RETRIES=3
+      - EXCHANGE_NAME=notifications.direct
+      - DLX_NAME=notifications.dlx
+      - FAILED_QUEUE_NAME=failed.queue
+      - REDIS_URL=redis://:redispassword@redis:6379/0
       - API_GATEWAY_URL=http://api-gateway:8000
-      - API_GATEWAY_API_KEY=test-api-key
-      - SMTP_HOST=smtp.gmail.com
-      - SMTP_PORT=587
-      - SMTP_USE_TLS=true
-      - SMTP_USERNAME=${SMTP_USERNAME}
+      - TEMPLATE_SERVICE_URL=http://template-service:3002
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-noreply@example.com}
-      - SMTP_FROM_NAME=Notification System
-      - RETRY_INITIAL_DELAY=1.0
-      - RETRY_MAX_DELAY=60.0
-      - RETRY_EXPONENTIAL_BASE=2.0
+      - SMTP_SECURE=false
+      - FROM_EMAIL=${FROM_EMAIL:-noreply@example.com}
+      - FROM_NAME=Notification System
+      - MAX_RETRIES=3
+      - CIRCUIT_BREAKER_THRESHOLD=5
+      - CIRCUIT_BREAKER_TIMEOUT=60000
     depends_on:
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       api-gateway:
+        condition: service_started
+      template-service:
         condition: service_started
     restart: unless-stopped
 
@@ -197,25 +243,25 @@ services:
   # Push Service
   # ------------------------------------------------------------------
   push-service:
-    build: ../services/push_service
+    build:
+      context: ../services/push_service
+      dockerfile: Dockerfile
+    container_name: push-service
+    ports:
+      - "8003:8000"
+    environment:
+      - RABBITMQ_HOST=amqp://admin:secretpassword@rabbitmq:5672/
+      - REDIS_HOST=redis://:redispassword@redis:6379/0
+      - FIREBASE_CREDENTIALS=/app/firebase-service-account.json
+      - PUSH_QUEUE_NAME=push.queue
+    volumes:
+      - ../services/push_service/firebase-service-account.json:/app/firebase-service-account.json:ro
     depends_on:
       rabbitmq:
         condition: service_healthy
       redis:
         condition: service_healthy
-    container_name: push-service
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - .:/services/push_service/app
-      - ./firebase-service-account.json:/services/push_service/app/firebase-service-account.json:ro
-    environment:
-      - RABBITMQ_HOST=amqp://admin:secretpassword@rabbitmq:5672/
-      - REDIS_HOST=redis://redis:6379/0
-      - FIREBASE_CREDENTIALS=./firebase-service-account.json
-      - PUSH_QUEUE_NAME=push.queue
-    ports:
-      - "8000:8000"
-    restart: on-failure
+    restart: unless-stopped
 
 volumes:
   postgres_data:
