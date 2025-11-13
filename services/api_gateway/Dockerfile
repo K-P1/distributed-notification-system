@@ -1,63 +1,59 @@
 # -------------------------------------
-# 🚀 API Gateway Dockerfile
+# API Gateway Dockerfile (Railway + Local)
 # -------------------------------------
 FROM python:3.12-slim AS builder
 
-# Install build dependencies
+# Install build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
-    libpq-dev \
+    build-essential gcc libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Copy only dependency files first (leverage Docker layer caching)
-COPY pyproject.toml poetry.lock* ./
+# Copy only dependency files (cache layer)
+COPY pyproject.toml ./
 
-# Install dependencies in editable mode
-RUN pip install --no-cache-dir -e .[all] || pip install --no-cache-dir .
+# Install dependencies (fallback if no extras)
+RUN pip install --no-cache-dir .
+
+# Copy full app code
+COPY . .
+
+# Install project in editable mode
+RUN pip install --no-cache-dir -e . || pip install --no-cache-dir .
 
 # -------------------------------------
-# 🏃 Runtime image (minimal & secure)
+# Runtime (super small)
 # -------------------------------------
 FROM python:3.12-slim
 
-# Avoid running as root
+# Non-root user
 RUN adduser --disabled-password --gecos '' appuser
 
 WORKDIR /app
 
-# Copy installed packages from builder
+# Copy installed packages
 COPY --from=builder /usr/local /usr/local
 
-# Copy application code
+# Copy app code
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 
-# Environment variables
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Environment (Railway sets these in UI)
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    APP_NAME=api-gateway \
-    ENVIRONMENT=production \
-    LOG_LEVEL=INFO \
-    PORT=8000 \
-    ENV=docker
+    PORT=8000
 
-# Expose port
 EXPOSE 8000
-
-# Healthcheck with curl (install curl in runtime if not present)
-RUN apt-get update && apt-get install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/*
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Switch to non-root user
 USER appuser
 
-# Run Uvicorn with production settings
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
