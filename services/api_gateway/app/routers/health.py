@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 router = APIRouter(tags=["health"])
 
@@ -38,7 +39,7 @@ async def health_check(request: Request) -> JSONResponse:
     try:
         db = request.app.state.db
         async for session in db.get_session():
-            await session.execute("SELECT 1")
+            await session.execute(text("SELECT 1"))
             health_status["dependencies"]["postgres"] = "healthy"
             break
     except Exception as e:
