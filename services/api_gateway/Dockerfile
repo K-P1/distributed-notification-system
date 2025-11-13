@@ -14,7 +14,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 
 # Install dependencies
-RUN pip install --upgrade pip && pip install uv && uv sync --frozen
+RUN pip install --upgrade pip && pip install uv && uv.lock && uv sync --frozen
 
 # Copy the rest of the app
 COPY . .
