@@ -551,8 +551,6 @@ docker exec -it postgres psql -U gateway_user -d gateway_db
 docker-compose logs postgres
 ```
 
-See [Integration & Deployment Guide](INTEGRATION_AND_DEPLOYMENT_GUIDE.md) for detailed troubleshooting.
-
 ## 🚀 Deployment
 
 ### Docker Compose (Recommended for Development/Testing)
