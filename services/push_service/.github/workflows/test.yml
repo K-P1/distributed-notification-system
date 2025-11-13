@@ -1,0 +1,38 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ main, push-service]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Docker
+        run: docker --version
+
+      - name: Build and start containers
+        run: |
+          docker-compose up --build
+
+
+      - name: Wait for services to be ready
+        run: sleep 10
+
+      - name: Run tests
+        run: pytest -v
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down
