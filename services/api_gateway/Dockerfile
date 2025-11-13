@@ -37,9 +37,7 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 COPY main.py ./
-
-# Optional: copy .env.example if you want defaults inside container
-COPY .env.example .env
+COPY .env.docker ./.env.docker
 
 # Set runtime env vars
 ENV PYTHONUNBUFFERED=1 \
@@ -47,7 +45,8 @@ ENV PYTHONUNBUFFERED=1 \
     APP_NAME=api-gateway \
     ENVIRONMENT=production \
     LOG_LEVEL=INFO \
-    PORT=8000
+    PORT=8000 \
+    ENV=docker
 
 # Expose port
 EXPOSE 8000
