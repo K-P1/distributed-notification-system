@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = os.getenv("REDIS_HOST")
     FCM_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS")
     PUSH_QUEUE_NAME: str = os.getenv("PUSH_QUEUE_NAME", "push.queue")
+    #Add these to your .env and remove default from here
     API_GATEWAY_BASE_URL: str = os.getenv("API_GATEWAY_BASE_URL", "https://distributed-notification-system-production-3a3b.up.railway.app")
     API_GATEWAY_API_KEY: str = os.getenv("API_GATEWAY_API_KEY", "apk_a7f3e2c1-9d4b-4f6a-8e1d-5c2b7f9a1e3d")
 
