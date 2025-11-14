@@ -1,0 +1,17 @@
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ["nodejs-18_x", "npm"]
+
+[phases.install]
+cmd = "npm ci --omit=dev"
+
+[phases.build]
+cmd = "npm run build:railway"
+
+[start]
+cmd = "node dist/main.js"
+
+[variables]
+NODE_ENV = "production"
+PORT = "8080"

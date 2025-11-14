@@ -11,6 +11,7 @@
 5. **Service Path**: `services/email-service`
 
 ### **Environment Variables to Set:**
+
 ```
 NODE_ENV=production
 PORT=3001
@@ -30,6 +31,7 @@ ENABLE_JSON_LOGGING=true
 ```
 
 ### **Alternative: Heroku Deployment**
+
 ```bash
 # Install Heroku CLI first
 heroku create omoke-email-service

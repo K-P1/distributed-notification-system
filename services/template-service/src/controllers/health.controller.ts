@@ -54,29 +54,68 @@ export class HealthController {
     const timestamp = new Date().toISOString();
 
     try {
-      // Check all dependencies in parallel
+      // Check all dependencies in parallel with shorter timeouts
       const [databaseHealth, redisHealth, templateStats, cacheStats] =
         await Promise.allSettled([
-          this.checkDatabaseHealth(),
-          this.checkRedisHealth(),
-          this.getTemplateStats(),
-          this.getCacheStats(),
+          Promise.race([
+            this.checkDatabaseHealth(),
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error('Database health timeout')),
+                5000,
+              ),
+            ),
+          ]),
+          Promise.race([
+            this.checkRedisHealth(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Redis health timeout')), 5000),
+            ),
+          ]),
+          Promise.race([
+            this.getTemplateStats(),
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error('Template stats timeout')),
+                3000,
+              ),
+            ),
+          ]),
+          Promise.race([
+            this.getCacheStats(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Cache stats timeout')), 3000),
+            ),
+          ]),
         ]);
 
       // Determine overall status
       const isDatabaseHealthy =
-        databaseHealth.status === 'fulfilled' && databaseHealth.value.healthy;
+        databaseHealth.status === 'fulfilled' &&
+        (databaseHealth.value as any).healthy;
       const isRedisHealthy =
-        redisHealth.status === 'fulfilled' && redisHealth.value.healthy;
+        redisHealth.status === 'fulfilled' &&
+        (redisHealth.value as any).healthy;
 
       let overallStatus: 'healthy' | 'degraded' | 'unhealthy';
 
-      if (isDatabaseHealthy && isRedisHealthy) {
-        overallStatus = 'healthy';
-      } else if (isDatabaseHealthy || isRedisHealthy) {
-        overallStatus = 'degraded';
+      // Be more lenient during startup - if either service is healthy, mark as degraded
+      const uptime = Date.now() - this.startTime;
+      if (uptime < 60000) {
+        // First minute after startup
+        if (isDatabaseHealthy || isRedisHealthy) {
+          overallStatus = 'degraded';
+        } else {
+          overallStatus = 'unhealthy';
+        }
       } else {
-        overallStatus = 'unhealthy';
+        if (isDatabaseHealthy && isRedisHealthy) {
+          overallStatus = 'healthy';
+        } else if (isDatabaseHealthy || isRedisHealthy) {
+          overallStatus = 'degraded';
+        } else {
+          overallStatus = 'unhealthy';
+        }
       }
 
       // Get memory usage
@@ -93,7 +132,7 @@ export class HealthController {
             status: isDatabaseHealthy ? 'healthy' : 'unhealthy',
             responseTime:
               databaseHealth.status === 'fulfilled'
-                ? databaseHealth.value.responseTime
+                ? (databaseHealth.value as any).responseTime
                 : undefined,
             details:
               databaseHealth.status === 'rejected'
@@ -104,7 +143,7 @@ export class HealthController {
             status: isRedisHealthy ? 'healthy' : 'unhealthy',
             responseTime:
               redisHealth.status === 'fulfilled'
-                ? redisHealth.value.responseTime
+                ? (redisHealth.value as any).responseTime
                 : undefined,
             details:
               redisHealth.status === 'rejected'
@@ -115,10 +154,12 @@ export class HealthController {
         metrics: {
           templates_count:
             templateStats.status === 'fulfilled'
-              ? templateStats.value.total
+              ? (templateStats.value as any).total
               : 0,
           cache_hit_rate:
-            cacheStats.status === 'fulfilled' ? cacheStats.value.hitRate : 0,
+            cacheStats.status === 'fulfilled'
+              ? (cacheStats.value as any).hitRate
+              : 0,
           memory_usage: {
             used: memoryUsage.heapUsed,
             total: memoryUsage.heapTotal,

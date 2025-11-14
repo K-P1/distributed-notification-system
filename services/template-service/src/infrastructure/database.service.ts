@@ -20,9 +20,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       user: this.config.databaseUser,
       password: this.config.databasePassword,
       database: this.config.databaseName,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      max: 10, // Reduced for Railway
+      min: 2, // Maintain minimum connections
+      idleTimeoutMillis: 60000, // 1 minute
+      connectionTimeoutMillis: 60000, // 1 minute for Railway latency
+      statement_timeout: 60000, // 1 minute query timeout
+      query_timeout: 60000, // 1 minute query timeout
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
     });
 
     this.pool.on('error', (error) => {
@@ -37,7 +42,41 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    await this.createTables();
+    // Start database initialization in background - don't block app startup
+    this.initializeDatabaseAsync();
+  }
+
+  private async initializeDatabaseAsync(): Promise<void> {
+    // Wait a bit before connecting to let Railway services fully initialize
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    let retries = 3;
+    let lastError: Error | undefined;
+
+    while (retries > 0) {
+      try {
+        await this.testConnection();
+        await this.createTables();
+        this.logger.info('database_initialization_completed');
+        return;
+      } catch (error) {
+        lastError = error as Error;
+        retries--;
+        this.logger.warn('database_initialization_failed', {
+          retries_left: retries,
+          error: lastError.message,
+        });
+
+        if (retries > 0) {
+          // Wait before retry with exponential backoff
+          const waitTime = (4 - retries) * 5000; // 5s, 10s, 15s
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+
+    this.logger.error('database_initialization_failed_final', lastError!);
+    // Don't throw error - let app continue to start for health checks
   }
 
   async onModuleDestroy() {
@@ -157,6 +196,46 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async checkHealth(): Promise<boolean> {
+    try {
+      const client = (await Promise.race([
+        this.pool.connect(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Health check timeout')), 5000),
+        ),
+      ])) as PoolClient;
+
+      try {
+        await client.query('SELECT 1');
+        return true;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      this.logger.warn('database_health_check_failed', {
+        error: (error as Error).message,
+      });
+      return false;
+    }
+  }
+
+  async testConnection(): Promise<void> {
+    this.logger.info('database_testing_connection');
+
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        'SELECT NOW() as server_time, version() as version',
+      );
+      this.logger.info('database_connection_test_passed', {
+        server_time: result.rows[0].server_time,
+        version: result.rows[0].version.substring(0, 50),
+      });
+    } finally {
+      client.release();
+    }
+  }
+
   private async createTables(): Promise<void> {
     try {
       this.logger.info('database_creating_tables');
@@ -236,16 +315,6 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error('database_table_creation_failed', error as Error);
       throw error;
-    }
-  }
-
-  async checkHealth(): Promise<boolean> {
-    try {
-      await this.query('SELECT 1');
-      return true;
-    } catch (error) {
-      this.logger.error('database_health_check_failed', error as Error);
-      return false;
     }
   }
 

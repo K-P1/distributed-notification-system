@@ -25,6 +25,7 @@ import { TemplateRepository } from './repositories/template.repository';
 import { TemplateController } from './controllers/template.controller';
 import { HealthController } from './controllers/health.controller';
 import { MetricsController } from './controllers/metrics.controller';
+import { SimpleHealthController } from './controllers/simple-health.controller';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { MetricsController } from './controllers/metrics.controller';
     TemplateController,
     HealthController,
     MetricsController,
+    SimpleHealthController,
   ],
   providers: [
     AppService,
