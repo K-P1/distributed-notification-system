@@ -2,6 +2,9 @@
 # Stage 1: Builder
 FROM python:3.11-slim as builder
 
+# Install build dependencies for asyncpg
+RUN apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
+
 # Install uv for fast dependency resolution
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
