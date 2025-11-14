@@ -14,8 +14,8 @@ RUN npm ci && npm cache clean --force
 # Copy source code
 COPY . .
 
-    # Build the application
-    RUN npx nest build
+# Build the application using TypeScript compiler directly
+RUN npx tsc -p tsconfig.build.json
 
 # Production stage  
 FROM node:20-alpine AS production
