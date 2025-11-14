@@ -80,6 +80,15 @@ class UserServiceClient:
                 return user_data
 
         except Exception as e:
+            # Log error details
+            log.error(
+                "user_service_failed",
+                user_id=user_id,
+                correlation_id=correlation_id,
+                url=self.base_url,
+                error=str(e),
+                exc_info=True,
+            )
             # Record error metrics
             service_call_errors_total.labels(
                 service_name="user_service",

@@ -89,6 +89,15 @@ class TemplateServiceClient:
                 return template_data
 
         except Exception as e:
+            # Log error details
+            log.error(
+                "template_service_failed",
+                template_code=template_code,
+                correlation_id=correlation_id,
+                url=self.base_url,
+                error=str(e),
+                exc_info=True,
+            )
             # Record error metrics
             service_call_errors_total.labels(
                 service_name="template_service",
