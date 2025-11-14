@@ -161,6 +161,14 @@ class EnrichmentService:
         try:
             user_data = await self.user_service.get_user(user_id, correlation_id)
 
+            # Log user data payload for debugging
+            log.info(
+                "user_data_received",
+                user_id=user_id,
+                user_data=user_data,
+                correlation_id=correlation_id,
+            )
+
             # Cache for future requests (5 min TTL)
             await self.service_cache.set("user", user_id, user_data)
 
@@ -242,13 +250,29 @@ class EnrichmentService:
 
         # Verify user preferences allow this channel
         preferences = user_data.get("preferences", {})
-        allowed_channels = preferences.get("channels", [])
 
-        if notification_type.value not in allowed_channels:
-            raise HTTPException(
-                status_code=422,
-                detail=f"User has disabled {notification_type.value} notifications",
-            )
+        log.info(
+            "user_preferences_check",
+            user_id=user_data.get("id", "unknown"),
+            notification_type=notification_type.value,
+            email_enabled=preferences.get("email_enabled", False),
+            push_enabled=preferences.get("push_enabled", False),
+            correlation_id="unknown",
+        )
+
+        # Check based on notification type
+        if notification_type == NotificationType.EMAIL:
+            if not preferences.get("email_enabled", False):
+                raise HTTPException(
+                    status_code=422,
+                    detail="User has disabled email notifications",
+                )
+        elif notification_type == NotificationType.PUSH:
+            if not preferences.get("push_enabled", False):
+                raise HTTPException(
+                    status_code=422,
+                    detail="User has disabled push notifications",
+                )
 
     def _validate_template_data(self, template_data: dict[str, Any]):
         """

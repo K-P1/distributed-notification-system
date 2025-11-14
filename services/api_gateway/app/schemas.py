@@ -43,13 +43,12 @@ class NotificationRequest(BaseModel):
             raise ValueError("template_code must contain only alphanumeric, dash, and underscore")
         return v
 
-    @field_validator("push_token")
-    @classmethod
-    def validate_push_token(cls, v: str | None, info) -> str | None:
+    @model_validator(mode="after")
+    def validate_push_token_required(self) -> "NotificationRequest":
         """Validate push token is provided for push notifications"""
-        if info.data.get("notification_type") == NotificationType.PUSH and not v:
+        if self.notification_type == NotificationType.PUSH and not self.push_token:
             raise ValueError("push_token is required for push notifications")
-        return v
+        return self
 
 
 class NotificationResponse(BaseModel):
