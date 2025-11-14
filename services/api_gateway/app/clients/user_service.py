@@ -60,7 +60,7 @@ class UserServiceClient:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.base_url}/users/{user_id}",
+                    f"{self.base_url}/user/{user_id}",
                     timeout=self.timeout,
                     headers={"X-Correlation-ID": correlation_id},
                 )

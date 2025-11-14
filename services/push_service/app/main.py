@@ -216,8 +216,8 @@ async def consume_push_queue():
     await app.state.channel.set_qos(prefetch_count=10)
 
     exchange = await app.state.channel.declare_exchange("notifications.direct",  durable=True)
-    queue = await app.state.channel.declare_queue(settings.PUSH_QUEUE_NAME, durable=True)
-    await queue.bind(exchange, routing_key=settings.PUSH_QUEUE_NAME)
+    queue = await app.state.channel.get_queue(settings.PUSH_QUEUE_NAME)
+    await queue.bind(exchange, routing_key="notification.push")
 
     
     await queue.consume(process_push_message)
