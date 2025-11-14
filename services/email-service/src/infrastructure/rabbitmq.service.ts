@@ -19,7 +19,13 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit() {
-    await this.connect();
+    // Don't block startup if RabbitMQ connection fails
+    try {
+      await this.connect();
+    } catch (error) {
+      this.logger.error('rabbitmq_init_failed_non_blocking', error as Error);
+      // Continue startup even if RabbitMQ fails
+    }
   }
 
   async onModuleDestroy() {
@@ -126,7 +132,13 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     ) => Promise<void>,
   ): Promise<void> {
     if (!this.channel) {
+      this.logger.warn('rabbitmq_channel_not_initialized', { queueName });
       throw new Error('Channel not initialized');
+    }
+
+    if (!this.isConnected) {
+      this.logger.warn('rabbitmq_not_connected', { queueName });
+      throw new Error('RabbitMQ not connected');
     }
 
     const circuitBreaker = this.circuitBreakerService.createCircuit(
