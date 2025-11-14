@@ -9,8 +9,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY yarn.lock* ./
 
-# Install dependencies (production only to avoid build dependencies)
-RUN npm ci --omit=dev && npm cache clean --force
+# Install ALL dependencies (including dev dependencies for build)
+RUN npm ci && npm cache clean --force
 
 # Copy source code
 COPY . .
@@ -27,10 +27,12 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nestjs -u 1001
 
+# Copy package files and install only production dependencies
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
 # Copy built application
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 
 # Expose port
 EXPOSE 3002

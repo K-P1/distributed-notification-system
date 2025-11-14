@@ -1,0 +1,19 @@
+# Nixpacks configuration for Template Service
+[phases.setup]
+nixPkgs = ["nodejs-18_x", "npm"]
+
+[phases.install]
+cmds = ["npm ci --production=false"]
+
+[phases.build]
+cmds = [
+  "export NODE_OPTIONS='--max-old-space-size=4096'",
+  "npx nest build"
+]
+
+[start]
+cmd = "node dist/main.js"
+
+[variables]
+NODE_ENV = "production"
+PORT = "3002"
