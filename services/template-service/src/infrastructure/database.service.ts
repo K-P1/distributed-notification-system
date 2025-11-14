@@ -14,15 +14,17 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     private readonly logger: LoggerService,
     private readonly circuitBreakerService: CircuitBreakerService,
   ) {
+    // Use DATABASE_URL directly for Railway compatibility
+    const databaseUrl = this.config.databaseUrl;
+    
     this.pool = new Pool({
-      host: this.config.databaseHost,
-      port: this.config.databasePort,
-      user: this.config.databaseUser,
-      password: this.config.databasePassword,
-      database: this.config.databaseName,
-      max: 20,
+      connectionString: databaseUrl,
+      max: 10, // Reduced pool size for Railway
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 30000, // Increased from 10s to 30s
+      query_timeout: 60000, // 60 second query timeout
+      statement_timeout: 60000, // 60 second statement timeout
+      ssl: databaseUrl.includes('railway') ? { rejectUnauthorized: false } : false,
     });
 
     this.pool.on('error', (error) => {
@@ -30,14 +32,63 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       this.isConnected = false;
     });
 
-    this.pool.on('connect', () => {
+    this.pool.on('connect', (client) => {
       this.isConnected = true;
       this.logger.info('database_connection_established');
+      
+      // Set connection-level timeouts
+      client.query('SET statement_timeout = 60000'); // 60s
+      client.query('SET lock_timeout = 30000'); // 30s
     });
   }
 
   async onModuleInit() {
-    await this.createTables();
+    try {
+      this.logger.info('database_initializing');
+      
+      // Test connection first
+      await this.testConnection();
+      
+      // Create tables with retry logic
+      await this.createTablesWithRetry();
+      
+      this.logger.info('database_initialization_complete');
+    } catch (error) {
+      this.logger.error('database_initialization_failed', error as Error);
+      // Don't throw - let the app start and mark as unhealthy
+      this.isConnected = false;
+    }
+  }
+
+  private async testConnection(): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('SELECT NOW()');
+      this.logger.info('database_connection_test_successful');
+    } finally {
+      client.release();
+    }
+  }
+
+  private async createTablesWithRetry(): Promise<void> {
+    const maxRetries = 3;
+    const retryDelay = 5000; // 5 seconds
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.createTables();
+        return; // Success!
+      } catch (error) {
+        this.logger.error(`database_table_creation_attempt_${attempt}_failed`, error as Error);
+        
+        if (attempt < maxRetries) {
+          this.logger.info(`database_retrying_in_${retryDelay}ms`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        } else {
+          throw error; // Final attempt failed
+        }
+      }
+    }
   }
 
   async onModuleDestroy() {
@@ -161,7 +212,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     try {
       this.logger.info('database_creating_tables');
 
-      // Templates table
+      // Create templates table first
       await this.query(`
         CREATE TABLE IF NOT EXISTS templates (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -184,7 +235,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         )
       `);
 
-      // Template versions table
+      // Create template versions table
       await this.query(`
         CREATE TABLE IF NOT EXISTS template_versions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -202,20 +253,45 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         )
       `);
 
-      // Indexes for performance
-      await this.query(`
-        CREATE INDEX IF NOT EXISTS idx_templates_code ON templates(code);
-        CREATE INDEX IF NOT EXISTS idx_templates_type ON templates(type);
-        CREATE INDEX IF NOT EXISTS idx_templates_language ON templates(language);
-        CREATE INDEX IF NOT EXISTS idx_templates_active ON templates(is_active);
-        CREATE INDEX IF NOT EXISTS idx_templates_created_at ON templates(created_at);
-        CREATE INDEX IF NOT EXISTS idx_templates_tags ON templates USING GIN(tags);
-        CREATE INDEX IF NOT EXISTS idx_template_versions_template_id ON template_versions(template_id);
-        CREATE INDEX IF NOT EXISTS idx_template_versions_version ON template_versions(version);
-        CREATE INDEX IF NOT EXISTS idx_template_versions_active ON template_versions(is_active);
-      `);
+      // Create indexes separately
+      await this.createIndexes();
 
-      // Trigger to update updated_at timestamp
+      // Create trigger function and triggers
+      await this.createTriggers();
+
+      this.logger.info('database_tables_created');
+    } catch (error) {
+      this.logger.error('database_table_creation_failed', error as Error);
+      throw error;
+    }
+  }
+
+  private async createIndexes(): Promise<void> {
+    const indexes = [
+      'CREATE INDEX IF NOT EXISTS idx_templates_code ON templates(code)',
+      'CREATE INDEX IF NOT EXISTS idx_templates_type ON templates(type)',
+      'CREATE INDEX IF NOT EXISTS idx_templates_language ON templates(language)',
+      'CREATE INDEX IF NOT EXISTS idx_templates_active ON templates(is_active)',
+      'CREATE INDEX IF NOT EXISTS idx_templates_created_at ON templates(created_at)',
+      'CREATE INDEX IF NOT EXISTS idx_templates_tags ON templates USING GIN(tags)',
+      'CREATE INDEX IF NOT EXISTS idx_template_versions_template_id ON template_versions(template_id)',
+      'CREATE INDEX IF NOT EXISTS idx_template_versions_version ON template_versions(version)',
+      'CREATE INDEX IF NOT EXISTS idx_template_versions_active ON template_versions(is_active)',
+    ];
+
+    for (const indexSql of indexes) {
+      try {
+        await this.query(indexSql);
+      } catch (error) {
+        this.logger.error('database_index_creation_failed', error as Error, { sql: indexSql });
+        // Continue with other indexes
+      }
+    }
+  }
+
+  private async createTriggers(): Promise<void> {
+    try {
+      // Create trigger function
       await this.query(`
         CREATE OR REPLACE FUNCTION update_updated_at_column()
         RETURNS TRIGGER AS $$
@@ -223,19 +299,20 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           NEW.updated_at = CURRENT_TIMESTAMP;
           RETURN NEW;
         END;
-        $$ language plpgsql;
+        $$ language plpgsql
+      `);
 
+      // Create trigger
+      await this.query(`
         DROP TRIGGER IF EXISTS update_templates_updated_at ON templates;
         CREATE TRIGGER update_templates_updated_at
           BEFORE UPDATE ON templates
           FOR EACH ROW
-          EXECUTE FUNCTION update_updated_at_column();
+          EXECUTE FUNCTION update_updated_at_column()
       `);
-
-      this.logger.info('database_tables_created');
     } catch (error) {
-      this.logger.error('database_table_creation_failed', error as Error);
-      throw error;
+      this.logger.error('database_trigger_creation_failed', error as Error);
+      // Don't throw - triggers are nice to have but not essential
     }
   }
 

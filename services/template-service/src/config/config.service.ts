@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { URL } from 'url';
 
 @Injectable()
 export class AppConfigService {
@@ -26,24 +27,34 @@ export class AppConfigService {
     );
   }
 
+  // Parse DATABASE_URL for Railway compatibility
+  private get parsedDatabaseUrl(): URL {
+    return new URL(this.databaseUrl);
+  }
+
   get databaseHost(): string {
-    return this.configService.get<string>('DB_HOST', 'localhost');
+    const parsed = this.parsedDatabaseUrl;
+    return parsed.hostname || this.configService.get<string>('DB_HOST', 'localhost');
   }
 
   get databasePort(): number {
-    return this.configService.get<number>('DB_PORT', 5432);
+    const parsed = this.parsedDatabaseUrl;
+    return parsed.port ? parseInt(parsed.port, 10) : this.configService.get<number>('DB_PORT', 5432);
   }
 
   get databaseUser(): string {
-    return this.configService.get<string>('DB_USER', 'postgres');
+    const parsed = this.parsedDatabaseUrl;
+    return parsed.username || this.configService.get<string>('DB_USER', 'postgres');
   }
 
   get databasePassword(): string {
-    return this.configService.get<string>('DB_PASSWORD', 'password');
+    const parsed = this.parsedDatabaseUrl;
+    return parsed.password || this.configService.get<string>('DB_PASSWORD', 'password');
   }
 
   get databaseName(): string {
-    return this.configService.get<string>('DB_NAME', 'template_db');
+    const parsed = this.parsedDatabaseUrl;
+    return parsed.pathname.slice(1) || this.configService.get<string>('DB_NAME', 'template_db');
   }
 
   // Redis Configuration
