@@ -72,7 +72,8 @@ class UserServiceClient:
 
                 response.raise_for_status()
 
-                user_data = response.json()
+                full_response = response.json()
+                user_data = full_response["data"]
 
                 # Record success metrics
                 duration = time.perf_counter() - start_time
