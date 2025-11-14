@@ -56,13 +56,14 @@ HEALTH_CHECK_INTERVAL=30000
 ✅ MAX_TEMPLATES_PER_USER  
 ✅ ALLOWED_FILE_TYPES  
 ✅ TEMPLATE_VALIDATION_TIMEOUT  
-✅ BACKGROUND_JOB_CONCURRENCY  
+✅ BACKGROUND_JOB_CONCURRENCY
 
 ### **4. Priority Order:**
 
 **Add these 3 variables FIRST:**
+
 1. `VERSION=1.0.0`
-2. `CIRCUIT_BREAKER_THRESHOLD=5` 
+2. `CIRCUIT_BREAKER_THRESHOLD=5`
 3. `CIRCUIT_BREAKER_TIMEOUT=60000`
 
 These are likely causing your health check failures.
@@ -70,6 +71,7 @@ These are likely causing your health check failures.
 ### **5. Watch Deployment:**
 
 After adding variables:
+
 1. Railway will auto-redeploy
 2. Watch the **Logs** tab for startup messages
 3. Look for "✅ Template Service started successfully!"
@@ -82,7 +84,7 @@ After adding variables:
 If health checks still fail after adding variables:
 
 1. **Check Logs**: Railway Dashboard → Template Service → Logs
-2. **Check Build**: Look for build errors or warnings  
+2. **Check Build**: Look for build errors or warnings
 3. **Test Locally**: Run with same environment variables
 4. **Contact Support**: Railway has excellent support if needed
 

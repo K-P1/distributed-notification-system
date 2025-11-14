@@ -8,7 +8,7 @@ async function bootstrap() {
   console.log('🚀 Template Service starting...');
   console.log('📊 Environment:', process.env.NODE_ENV);
   console.log('🔌 Port:', process.env.PORT);
-  
+
   try {
     console.log('🏗️ Creating NestJS application...');
     const app = await NestFactory.create(AppModule, {
@@ -44,7 +44,7 @@ async function bootstrap() {
     console.log(`🚀 Starting server on port ${port}...`);
 
     await app.listen(port);
-    
+
     console.log('✅ Template Service started successfully!');
     console.log(`🌍 Health check: http://localhost:${port}/api/v1/health`);
 
@@ -84,7 +84,6 @@ async function bootstrap() {
       loggerService.error('uncaught_exception', error);
       process.exit(1);
     });
-    
   } catch (error) {
     console.error('❌ Failed to start Template Service:', error);
     console.error('Stack trace:', error.stack);
@@ -92,7 +91,7 @@ async function bootstrap() {
   }
 }
 
-bootstrap().catch(error => {
+bootstrap().catch((error) => {
   console.error('❌ Bootstrap failed:', error);
   process.exit(1);
 });
