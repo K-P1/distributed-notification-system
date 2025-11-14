@@ -25,6 +25,7 @@ class UserServiceClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.base_url = settings.user_service_url
+        self.base_url = self.base_url.strip()
         self.timeout = settings.user_service_timeout
 
     @circuit(

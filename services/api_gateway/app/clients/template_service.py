@@ -25,6 +25,7 @@ class TemplateServiceClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.base_url = settings.template_service_url
+        self.base_url = self.base_url.strip()
         self.timeout = settings.template_service_timeout
 
     @circuit(
