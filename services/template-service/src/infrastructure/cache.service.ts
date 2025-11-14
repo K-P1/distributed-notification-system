@@ -65,7 +65,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         const duration = Date.now() - startTime;
         this.logger.logPerformance('cache_get', duration, true, correlationId);
 
-        if (value) {
+        if (value && typeof value === 'string') {
           this.stats.hits++;
           this.logger.logCacheOperation('hit', key, correlationId);
           return JSON.parse(value) as T;

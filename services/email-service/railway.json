@@ -1,0 +1,10 @@
+# Railway Deployment Configuration
+{
+  "build": {
+    "builder": "nixpacks"
+  },
+  "deploy": {
+    "startCommand": "npm run start:prod",
+    "healthcheckPath": "/health"
+  }
+}
