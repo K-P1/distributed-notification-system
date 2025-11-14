@@ -1,0 +1,133 @@
+# Docker Compose Configuration for Production with CloudAMQP
+
+version: "3.8"
+
+services:
+  # ------------------------------------------------------------------
+  # Email Service - Production Configuration with CloudAMQP
+  # ------------------------------------------------------------------
+  email-service:
+    build: 
+      context: ../services/email-service
+      dockerfile: Dockerfile
+    container_name: email-service-prod
+    ports:
+      - "3001:3001"
+    environment:
+      # Production environment
+      NODE_ENV: production
+      PORT: 3001
+      
+      # CloudAMQP Configuration (Production RabbitMQ)
+      RABBITMQ_URL: amqps://neoxhbgv:ObO_9mg7l72Qavudd_4cAgv5o4nkmklS@gorilla.lmq.cloudamqp.com/neoxhbgv
+      EMAIL_QUEUE_NAME: email.queue
+      EXCHANGE_NAME: notifications.direct
+      DLX_NAME: notifications.dlx
+      FAILED_QUEUE_NAME: failed.queue
+      
+      # Redis (can keep local or use cloud Redis)
+      REDIS_URL: redis://redis:6379
+      
+      # SMTP Configuration (update with real credentials)
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_SECURE: false
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      FROM_EMAIL: ${FROM_EMAIL}
+      FROM_NAME: "Notification Service"
+      
+      # Service URLs (update for production)
+      API_GATEWAY_URL: http://api-gateway:8000
+      TEMPLATE_SERVICE_URL: http://template-service:3002
+      
+      # Circuit Breaker & Retry
+      CIRCUIT_BREAKER_THRESHOLD: 5
+      CIRCUIT_BREAKER_TIMEOUT: 60000
+      MAX_RETRIES: 3
+      RETRY_DELAY_MS: 1000
+      
+      # Logging
+      LOG_LEVEL: info
+      ENABLE_JSON_LOGGING: true
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ------------------------------------------------------------------
+  # Template Service - Production Configuration
+  # ------------------------------------------------------------------
+  template-service:
+    build:
+      context: ../services/template-service
+      dockerfile: Dockerfile
+    container_name: template-service-prod
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DATABASE_URL: postgresql://template_user:templatepassword@postgres-template:5432/template_db
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: info
+    depends_on:
+      - postgres-template
+      - redis
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # PostgreSQL Database - Template Service
+  # ------------------------------------------------------------------
+  postgres-template:
+    image: postgres:15-alpine
+    container_name: postgres-template-prod
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: template_user
+      POSTGRES_PASSWORD: templatepassword
+      POSTGRES_DB: template_db
+    volumes:
+      - postgres_template_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U template_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # Redis Cache
+  # ------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # Note: RabbitMQ service removed - using CloudAMQP instead
+  # The email service connects directly to CloudAMQP at:
+  # gorilla.lmq.cloudamqp.com:5671 (TLS)
+  # ------------------------------------------------------------------
+
+volumes:
+  postgres_template_data:
+  redis_data:
+
+# Production Docker Compose Usage:
+# 1. Create .env file with SMTP credentials
+# 2. Run: docker-compose -f docker-compose.prod.yml up -d
+# 3. Services will connect to CloudAMQP automatically
