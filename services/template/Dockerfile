@@ -12,12 +12,12 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Copy dependency files and app directory (needed for editable install)
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
 COPY README.md ./
 COPY app ./app
 
 # Install dependencies using uv (creates .venv)
-RUN uv sync --no-dev
+RUN uv sync --frozen --no-dev
 
 # Stage 2: Runtime
 FROM python:3.11-slim
@@ -26,8 +26,7 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:$PATH" \
-    PORT=8002 \
-    UV_CACHE_DIR=/app/.uv_cache
+    PORT=8002 
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -35,21 +34,15 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 # Set working directory
 WORKDIR /app
 
-# Install uv for running commands
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
-
-# Fix permissions on binaries (A MUST for alembic, uvicorn, etc.)
-RUN chmod -R u+x /app/.venv/bin
 
 # Copy application code
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
 
-# Fix ownership AFTER chmod
+# Change ownership to non-root user
 RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
@@ -63,4 +56,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health').read()"
 
 # Run the application
-CMD sh -c "uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1 --loop uvloop"
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1 --loop uvloop
