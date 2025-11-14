@@ -136,7 +136,7 @@ class UserServiceClient:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.base_url}/auth/users",
+                    f"{self.base_url}/auth/signup",
                     json=user_data,
                     timeout=self.timeout,
                     headers={
