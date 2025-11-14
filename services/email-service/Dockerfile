@@ -11,11 +11,14 @@ COPY package*.json ./
 # Install all dependencies for building
 RUN npm ci && npm cache clean --force
 
+# Install TypeScript globally to avoid npx permission issues
+RUN npm install -g typescript
+
 # Copy source code
 COPY . .
 
-    # Build the application
-    RUN npx nest build
+# Build the application using TypeScript compiler directly
+RUN tsc -p tsconfig.build.json
 
 # Production stage  
 FROM node:20-alpine AS production

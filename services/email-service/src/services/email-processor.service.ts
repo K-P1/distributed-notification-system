@@ -26,8 +26,11 @@ export class EmailProcessor implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Start consuming messages from the email queue
-    this.startProcessing();
+    // Start consuming messages from the email queue (non-blocking)
+    this.startProcessing().catch(error => {
+      this.logger.error('email_processor_init_failed', error as Error);
+      // Don't crash the app if email processor fails to start
+    });
   }
 
   private async startProcessing(): Promise<void> {
