@@ -108,7 +108,7 @@ def mock_user_service():
             "id": str(uuid4()),
             "email": "test@example.com",
             "name": "Test User",
-            "push_token": "fake_push_token",
+            "device_token": "fake_device_token",
             "preferences": {"channels": ["email", "push"]},
             "is_active": True,
         }
@@ -224,7 +224,7 @@ def sample_user_data():
         "id": str(uuid4()),
         "email": "user@example.com",
         "name": "Test User",
-        "push_token": "test_push_token",
+        "device_token": "test_device_token",
         "preferences": {"channels": ["email", "push"]},
         "is_active": True,
     }

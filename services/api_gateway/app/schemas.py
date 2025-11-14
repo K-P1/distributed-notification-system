@@ -40,7 +40,7 @@ class NotificationRequest(BaseModel):
     variables: dict[str, Any] = Field(default_factory=dict)
     priority: int = Field(default=5, ge=1, le=10)
     request_id: str | None = Field(None, min_length=1, max_length=100)
-    push_token: DeviceToken | None = None
+    device_token: DeviceToken | None = None
 
     @field_validator("template_code")
     @classmethod
@@ -51,10 +51,10 @@ class NotificationRequest(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_push_token_required(self) -> "NotificationRequest":
+    def validate_device_token_required(self) -> "NotificationRequest":
         """Validate push token is provided for push notifications"""
-        if self.notification_type == NotificationType.PUSH and not self.push_token:
-            raise ValueError("push_token is required for push notifications")
+        if self.notification_type == NotificationType.PUSH and not self.device_token:
+            raise ValueError("device_token is required for push notifications")
         return self
 
 
@@ -148,4 +148,4 @@ class MessageEnvelope(BaseModel):
     timestamp: datetime
     user_data: dict[str, Any]
     template_data: dict[str, Any]
-    push_token: DeviceToken | None = None
+    device_token: DeviceToken | None = None
