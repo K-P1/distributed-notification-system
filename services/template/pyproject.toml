@@ -1,5 +1,5 @@
 [project]
-name = "template-service"
+name = "template"
 version = "1.0.0"
 description = "Template Service for Distributed Notification System"
 readme = "README.md"
@@ -40,3 +40,6 @@ python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
