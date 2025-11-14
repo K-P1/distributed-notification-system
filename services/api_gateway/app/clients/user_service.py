@@ -102,3 +102,77 @@ class UserServiceClient:
                 error_type=type(e).__name__,
             ).inc()
             raise
+
+    @circuit(
+        failure_threshold=5,
+        recovery_timeout=30,
+        expected_exception=(httpx.HTTPStatusError, httpx.TimeoutException),
+    )
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=0.5, min=0.5, max=10),
+        retry=retry_if_exception_type((httpx.TimeoutException, httpx.ConnectError)),
+    )
+    async def create_user(self, user_data: dict[str, Any], correlation_id: str) -> dict[str, Any]:
+        """
+        Create a new user with circuit breaker and retry.
+
+        Args:
+            user_data: User creation data
+            correlation_id: Request correlation ID
+
+        Returns:
+            Created user data dict
+
+        Raises:
+            httpx.HTTPStatusError: On 4xx/5xx responses
+            httpx.TimeoutException: On timeout
+        """
+        log.info("user_service_create_request", correlation_id=correlation_id, url=self.base_url)
+
+        # Start timing
+        start_time = time.perf_counter()
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/auth/users",
+                    json=user_data,
+                    timeout=self.timeout,
+                    headers={
+                        "X-Correlation-ID": correlation_id,
+                        "X-API-Key": self.api_key,
+                    },
+                )
+
+                response.raise_for_status()
+
+                full_response = response.json()
+                created_user = full_response["data"]
+
+                # Record success metrics
+                duration = time.perf_counter() - start_time
+                service_call_duration_seconds.labels(
+                    service_name="user_service", operation="create_user"
+                ).observe(duration)
+
+                log.info("user_service_create_success", correlation_id=correlation_id)
+
+                return created_user
+
+        except Exception as e:
+            # Log error details
+            log.error(
+                "user_service_create_failed",
+                correlation_id=correlation_id,
+                url=self.base_url,
+                error=str(e),
+                exc_info=True,
+            )
+            # Record error metrics
+            service_call_errors_total.labels(
+                service_name="user_service",
+                operation="create_user",
+                error_type=type(e).__name__,
+            ).inc()
+            raise

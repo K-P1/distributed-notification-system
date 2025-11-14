@@ -6,6 +6,7 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.redis_client import RateLimiter, StatusCache
+from app.clients.user_service import UserServiceClient
 from app.database import DatabaseManager
 from app.repositories import StatusRepository
 from app.services.enrichment import EnrichmentService
@@ -74,6 +75,11 @@ def get_enrichment_service(request: Request) -> EnrichmentService:
         request.app.state.template_service,
         request.app.state.service_cache,
     )
+
+
+def get_user_service(request: Request) -> UserServiceClient:
+    """Get user service client instance"""
+    return request.app.state.user_service
 
 
 def get_notification_service(

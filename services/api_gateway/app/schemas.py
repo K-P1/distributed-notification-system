@@ -15,13 +15,6 @@ class NotificationType(str, Enum):
     PUSH = "push"
 
 
-class DeviceToken(BaseModel):
-    """Device token for push notifications"""
-
-    token: str = Field(..., min_length=1, max_length=500)
-    device_type: str = Field(..., min_length=1, max_length=50)
-
-
 class NotificationStatus(str, Enum):
     """Notification status enum"""
 
@@ -40,7 +33,6 @@ class NotificationRequest(BaseModel):
     variables: dict[str, Any] = Field(default_factory=dict)
     priority: int = Field(default=5, ge=1, le=10)
     request_id: str | None = Field(None, min_length=1, max_length=100)
-    device_token: DeviceToken | None = None
 
     @field_validator("template_code")
     @classmethod
@@ -49,13 +41,6 @@ class NotificationRequest(BaseModel):
         if not v.replace("-", "").replace("_", "").isalnum():
             raise ValueError("template_code must contain only alphanumeric, dash, and underscore")
         return v
-
-    @model_validator(mode="after")
-    def validate_device_token_required(self) -> "NotificationRequest":
-        """Validate push token is provided for push notifications"""
-        if self.notification_type == NotificationType.PUSH and not self.device_token:
-            raise ValueError("device_token is required for push notifications")
-        return self
 
 
 class NotificationResponse(BaseModel):
@@ -133,6 +118,43 @@ class HealthCheckResponse(BaseModel):
     dependencies: dict[str, str]
 
 
+class UserPreferences(BaseModel):
+    """User notification preferences"""
+
+    email_enabled: bool = True
+    push_enabled: bool = True
+    language: str = Field(default="en", min_length=2, max_length=10)
+    email_frequency: int = Field(default=0, ge=0)
+    push_frequency: int = Field(default=0, ge=0)
+
+
+class UserCreateRequest(BaseModel):
+    """User creation request"""
+
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+    name: str = Field(..., min_length=1, max_length=255)
+    push_token: str | None = Field(None, min_length=1, max_length=500)
+    preferences: UserPreferences = Field(default_factory=UserPreferences)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        """Basic email validation"""
+        if "@" not in v or "." not in v.split("@")[-1]:
+            raise ValueError("Invalid email format")
+        return v.lower()
+
+
+class UserCreateResponse(BaseModel):
+    """User creation response"""
+
+    user_id: UUID
+    email: str
+    name: str
+    created_at: datetime
+
+
 class MessageEnvelope(BaseModel):
     """Message envelope for queue"""
 
@@ -148,4 +170,3 @@ class MessageEnvelope(BaseModel):
     timestamp: datetime
     user_data: dict[str, Any]
     template_data: dict[str, Any]
-    device_token: DeviceToken | None = None

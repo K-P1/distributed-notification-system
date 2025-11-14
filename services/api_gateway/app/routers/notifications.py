@@ -54,7 +54,6 @@ async def submit_notification(
         notification_type=request.notification_type,
         user_id=str(request.user_id),
         template_code=request.template_code,
-        has_device_token=request.device_token is not None,
         correlation_id=correlation_id,
     )
 

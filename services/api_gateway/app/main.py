@@ -31,7 +31,7 @@ from app.database import DatabaseManager
 from app.middleware.correlation import CorrelationIDMiddleware
 from app.middleware.logging import configure_logging
 from app.middleware.metrics_middleware import MetricsMiddleware
-from app.routers import health, notifications, metrics
+from app.routers import health, notifications, metrics, users
 from app.routers import status as status_router
 from app.metrics import initialize_metrics
 
@@ -124,6 +124,7 @@ app.add_middleware(CorrelationIDMiddleware)
 # Include API routers
 app.include_router(notifications.router)
 app.include_router(status_router.router)
+app.include_router(users.router)
 app.include_router(health.router)
 app.include_router(metrics.router)
 
