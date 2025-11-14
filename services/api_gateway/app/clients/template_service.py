@@ -66,7 +66,7 @@ class TemplateServiceClient:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.base_url}/templates/{template_code}",
+                    f"{self.base_url}/api/v1/templates/code/{template_code}",
                     timeout=self.timeout,
                     headers={"X-Correlation-ID": correlation_id},
                 )

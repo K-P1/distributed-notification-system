@@ -17,7 +17,6 @@ from app.schemas import (
     TemplateResponse,
     TemplateUpdate,
 )
-from app.security import verify_api_key
 
 router = APIRouter(prefix="/api/v1/templates", tags=["templates"])
 
@@ -26,7 +25,6 @@ router = APIRouter(prefix="/api/v1/templates", tags=["templates"])
 async def create_template(
     template_data: TemplateCreate,
     db: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ) -> ApiResponse:
     """
     Create a new template.
@@ -76,7 +74,6 @@ async def create_template(
 async def get_template(
     template_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ) -> ApiResponse:
     """Get template by ID."""
     repo = TemplateRepository(db)
@@ -100,7 +97,6 @@ async def get_template_by_code(
     code: str,
     language: str = Query(default="en", description="Language code"),
     db: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ) -> TemplateBasicInfo:
     """
     Get template by code and language.
@@ -133,7 +129,6 @@ async def render_template(
     render_request: TemplateRenderRequest,
     language: str = Query(default="en", description="Language code"),
     db: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ) -> TemplateRenderResponse:
     """
     Render a template with provided variables.
@@ -177,7 +172,6 @@ async def update_template(
     template_id: uuid.UUID,
     template_data: TemplateUpdate,
     db: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ) -> ApiResponse:
     """
     Update template information.
@@ -225,7 +219,6 @@ async def update_template(
 async def delete_template(
     template_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ) -> ApiResponse:
     """Soft delete a template (marks as inactive)."""
     repo = TemplateRepository(db)
@@ -249,7 +242,6 @@ async def list_templates(
     limit: int = Query(default=100, ge=1, le=100),
     language: str | None = Query(default=None, description="Filter by language code"),
     db: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ) -> ApiResponse:
     """
     List all active templates with pagination.

@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     template_service_retry_delay: float = 0.5
     template_service_circuit_failure_threshold: int = 5
     template_service_circuit_recovery_timeout: int = 30
+    template_service_api_key: str = ""
 
     # === Redis ===
     redis_host: str = "redis"
