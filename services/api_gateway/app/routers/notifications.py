@@ -49,8 +49,27 @@ async def submit_notification(
         429: Rate limit exceeded
         503: Service unavailable
     """
-    response = await notification_service.submit_notification(request, correlation_id)
-    return response
+    log.info(
+        "notification_request_received",
+        notification_type=request.notification_type,
+        user_id=str(request.user_id),
+        template_code=request.template_code,
+        has_push_token=request.push_token is not None,
+        correlation_id=correlation_id,
+    )
+
+    try:
+        response = await notification_service.submit_notification(request, correlation_id)
+        return response
+    except Exception as e:
+        log.error(
+            "notification_submission_failed",
+            error=str(e),
+            error_type=type(e).__name__,
+            correlation_id=correlation_id,
+            exc_info=True,
+        )
+        raise
 
 
 @router.get(
