@@ -135,6 +135,75 @@ async def get_rendered_template(template_data: TemplateData, variables: Dict) ->
             )
 
 
+async def update_notification_status(
+    notification_id: str,
+    new_status: str,
+    error_message: str = "",
+    metadata: Dict[str, Any] = None
+):
+    """
+    Update notification status in API Gateway.
+    
+    Args:
+        notification_id: UUID of the notification
+        new_status: Must be one of: 'processing', 'delivered', 'failed'
+        error_message: Optional error message for failed status
+        metadata: Optional additional metadata
+    """
+    if not settings.API_GATEWAY_API_KEY:
+        logger.warning("API_GATEWAY_API_KEY not configured, skipping status update")
+        return
+    
+    try:
+        url = f"{settings.API_GATEWAY_BASE_URL}/push/status"
+        headers = {
+            "X-API-Key": settings.API_GATEWAY_API_KEY,
+            "Content-Type": "application/json"
+        }
+        params = {"notification_id": notification_id}
+        payload = {
+            "new_status": new_status,
+            "error_message": error_message,
+            "changed_by": "push-service",
+            "metadata": metadata or {}
+        }
+        
+        logger.info(
+            "Updating notification status",
+            notification_id=notification_id,
+            new_status=new_status,
+            url=url
+        )
+        
+        response = await app.state.httpx_client.post(
+            url,
+            params=params,
+            headers=headers,
+            json=payload,
+            timeout=10.0
+        )
+        
+        if response.status_code == 200:
+            logger.info(
+                "Status updated successfully",
+                notification_id=notification_id,
+                new_status=new_status
+            )
+        else:
+            logger.error(
+                "Failed to update status",
+                notification_id=notification_id,
+                status_code=response.status_code,
+                response=response.text
+            )
+    except Exception as e:
+        logger.exception(
+            "Error updating notification status",
+            notification_id=notification_id,
+            error=str(e)
+        )
+
+
 async def process_push_message(message: aio_pika.IncomingMessage):
     """Process incoming push notification message."""
     logger.info("Received push message", message_id=message.message_id)
@@ -156,6 +225,13 @@ async def process_push_message(message: aio_pika.IncomingMessage):
         )
 
         logger.info("Processing push with template", payload=payload)
+
+        # Update status to processing
+        await update_notification_status(
+            notification_id=notification_id,
+            new_status="processing",
+            metadata={"request_id": request_id}
+        )
 
         # Idempotency
         if await is_duplicate_request(request_id):
@@ -188,16 +264,62 @@ async def process_push_message(message: aio_pika.IncomingMessage):
             )
             logger.info("Push delivered", fcm_response=fcm_response)
             await app.state.redis.setex(f"notification_status:{request_id}", 3600, "delivered")
+            
+            # Update status to delivered
+            await update_notification_status(
+                notification_id=notification_id,
+                new_status="delivered",
+                metadata={
+                    "device_token": device_token.token[:20] + "...",
+                    "provider": "fcm",
+                    "fcm_response": fcm_response
+                }
+            )
 
         except messaging.UnregisteredError:
             logger.warning("Token unregistered", token=device_token)
             await app.state.redis.setex(f"notification_status:{request_id}", 3600, "failed:unregistered")
+            
+            # Update status to failed
+            await update_notification_status(
+                notification_id=notification_id,
+                new_status="failed",
+                error_message="Invalid registration token: Token is unregistered",
+                metadata={
+                    "error_type": "UnregisteredError",
+                    "provider": "fcm"
+                }
+            )
         except CircuitBreakerError:
             logger.error("FCM circuit open")
+            
+            # Update status to failed
+            await update_notification_status(
+                notification_id=notification_id,
+                new_status="failed",
+                error_message="Service temporarily unavailable: Circuit breaker open",
+                metadata={
+                    "error_type": "CircuitBreakerError",
+                    "will_retry": True
+                }
+            )
+            
             await message.nack(requeue=True)
             return
         except Exception as e:
             logger.exception("FCM send failed", error=str(e))
+            
+            # Update status to failed
+            await update_notification_status(
+                notification_id=notification_id,
+                new_status="failed",
+                error_message=f"FCM send failed: {str(e)}",
+                metadata={
+                    "error_type": type(e).__name__,
+                    "will_retry": True
+                }
+            )
+            
             await message.nack(requeue=True)
             return
 
