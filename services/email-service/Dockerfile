@@ -15,7 +15,9 @@ RUN npm ci && npm cache clean --force
 COPY . .
 
     # Build the application
-    RUN npx nest build# Production stage  
+    RUN npx nest build
+
+# Production stage  
 FROM node:20-alpine AS production
 
 WORKDIR /app
