@@ -26,7 +26,8 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:$PATH" \
-    PORT=8002
+    PORT=8002 \
+    UV_CACHE_DIR=/app/.uv_cache
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
