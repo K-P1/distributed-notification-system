@@ -116,3 +116,8 @@ no_strict_optional = true
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+
+[dependency-groups]
+dev = [
+    "fakeredis>=2.20.1",
+]

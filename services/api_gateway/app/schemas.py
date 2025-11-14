@@ -15,6 +15,13 @@ class NotificationType(str, Enum):
     PUSH = "push"
 
 
+class DeviceToken(BaseModel):
+    """Device token for push notifications"""
+
+    token: str = Field(..., min_length=1, max_length=500)
+    device_type: str = Field(..., min_length=1, max_length=50)
+
+
 class NotificationStatus(str, Enum):
     """Notification status enum"""
 
@@ -33,7 +40,7 @@ class NotificationRequest(BaseModel):
     variables: dict[str, Any] = Field(default_factory=dict)
     priority: int = Field(default=5, ge=1, le=10)
     request_id: str | None = Field(None, min_length=1, max_length=100)
-    push_token: str | None = Field(None, min_length=1, max_length=500)
+    push_token: DeviceToken | None = None
 
     @field_validator("template_code")
     @classmethod
@@ -141,4 +148,4 @@ class MessageEnvelope(BaseModel):
     timestamp: datetime
     user_data: dict[str, Any]
     template_data: dict[str, Any]
-    push_token: str | None = None
+    push_token: DeviceToken | None = None
