@@ -56,6 +56,7 @@ class TemplateServiceClient:
             "template_service_request",
             template_code=template_code,
             correlation_id=correlation_id,
+            url=self.base_url,
         )
 
         # Start timing

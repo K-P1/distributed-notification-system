@@ -52,7 +52,7 @@ class UserServiceClient:
             httpx.HTTPStatusError: On 4xx/5xx responses
             httpx.TimeoutException: On timeout
         """
-        log.info("user_service_request", user_id=user_id, correlation_id=correlation_id)
+        log.info("user_service_request", user_id=user_id, correlation_id=correlation_id, url=self.base_url)
 
         # Start timing
         start_time = time.perf_counter()
