@@ -25,6 +25,7 @@ class UserServiceClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.base_url = settings.user_service_url
+        self.base_url = self.base_url.strip()
         self.timeout = settings.user_service_timeout
 
     @circuit(
@@ -52,7 +53,7 @@ class UserServiceClient:
             httpx.HTTPStatusError: On 4xx/5xx responses
             httpx.TimeoutException: On timeout
         """
-        log.info("user_service_request", user_id=user_id, correlation_id=correlation_id)
+        log.info("user_service_request", user_id=user_id, correlation_id=correlation_id, url=self.base_url)
 
         # Start timing
         start_time = time.perf_counter()
@@ -60,7 +61,7 @@ class UserServiceClient:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.base_url}/users/{user_id}",
+                    f"{self.base_url}/user/{user_id}",
                     timeout=self.timeout,
                     headers={"X-Correlation-ID": correlation_id},
                 )
@@ -80,6 +81,15 @@ class UserServiceClient:
                 return user_data
 
         except Exception as e:
+            # Log error details
+            log.error(
+                "user_service_failed",
+                user_id=user_id,
+                correlation_id=correlation_id,
+                url=self.base_url,
+                error=str(e),
+                exc_info=True,
+            )
             # Record error metrics
             service_call_errors_total.labels(
                 service_name="user_service",
