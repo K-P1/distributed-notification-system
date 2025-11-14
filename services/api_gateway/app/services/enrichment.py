@@ -224,7 +224,7 @@ class EnrichmentService:
 
         Checks:
         - Email notifications require email address
-        - Push notifications require push token
+        - Push notifications require push token (provided separately in request)
         - User preferences must allow the channel
 
         Args:
@@ -238,9 +238,7 @@ class EnrichmentService:
         if notification_type == NotificationType.EMAIL:
             if not user_data.get("email"):
                 raise HTTPException(status_code=422, detail="User has no email address")
-        elif notification_type == NotificationType.PUSH:
-            if not user_data.get("push_token"):
-                raise HTTPException(status_code=422, detail="User has no push token")
+        # Push token validation removed - now provided in request
 
         # Verify user preferences allow this channel
         preferences = user_data.get("preferences", {})

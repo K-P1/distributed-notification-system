@@ -120,6 +120,7 @@ class NotificationService:
                 timestamp=datetime.now(UTC),
                 user_data=user_data,
                 template_data=template_data,
+                push_token=request.push_token,
             )
 
             # Route and publish

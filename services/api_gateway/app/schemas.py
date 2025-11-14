@@ -33,6 +33,7 @@ class NotificationRequest(BaseModel):
     variables: dict[str, Any] = Field(default_factory=dict)
     priority: int = Field(default=5, ge=1, le=10)
     request_id: str | None = Field(None, min_length=1, max_length=100)
+    push_token: str | None = Field(None, min_length=1, max_length=500)
 
     @field_validator("template_code")
     @classmethod
@@ -40,6 +41,14 @@ class NotificationRequest(BaseModel):
         """Validate template code format"""
         if not v.replace("-", "").replace("_", "").isalnum():
             raise ValueError("template_code must contain only alphanumeric, dash, and underscore")
+        return v
+
+    @field_validator("push_token")
+    @classmethod
+    def validate_push_token(cls, v: str | None, info) -> str | None:
+        """Validate push token is provided for push notifications"""
+        if info.data.get("notification_type") == NotificationType.PUSH and not v:
+            raise ValueError("push_token is required for push notifications")
         return v
 
 
@@ -133,3 +142,4 @@ class MessageEnvelope(BaseModel):
     timestamp: datetime
     user_data: dict[str, Any]
     template_data: dict[str, Any]
+    push_token: str | None = None

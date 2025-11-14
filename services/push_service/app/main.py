@@ -164,18 +164,18 @@ async def process_push_message(message: aio_pika.IncomingMessage):
             return
 
         # Extract
-        device_token = payload["device_token"]
+        push_token = payload.get("push_token")
         template_data = payload["template_data"]
         variables = payload.get("variables", {})
 
-        if not device_token or not template_data:
-            logger.error("Missing required fields")
+        if not push_token or not template_data:
+            logger.error("Missing required fields: push_token or template_data")
             await message.nack(requeue=False)
             return
 
         device_token = DeviceToken(
-            token=device_token['token'],
-            device_type = device_token.get('type', 'web')
+            token=push_token,
+            device_type=DeviceType.WEB  # Default to web, can be extended later
         )
         # Fetch & render template
         rendered = await get_rendered_template(template_data, variables)
