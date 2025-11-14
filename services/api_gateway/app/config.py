@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     user_service_retry_delay: float = 0.5
     user_service_circuit_failure_threshold: int = 5
     user_service_circuit_recovery_timeout: int = 30
+    user_service_api_key: str = ""
 
     # === Template Service ===
     template_service_url: str = ""
@@ -131,6 +132,8 @@ class Settings(BaseSettings):
             raise ValueError("USER_SERVICE_URL must be set in environment variables")
         if not self.template_service_url:
             raise ValueError("TEMPLATE_SERVICE_URL must be set in environment variables")
+        if not self.user_service_api_key:
+            raise ValueError("USER_SERVICE_API_KEY must be set in environment variables")
         if not self.jwt_secret_key:
             raise ValueError("JWT_SECRET_KEY must be set in environment variables")
 

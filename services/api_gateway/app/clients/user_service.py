@@ -27,6 +27,7 @@ class UserServiceClient:
         self.base_url = settings.user_service_url
         self.base_url = self.base_url.strip()
         self.timeout = settings.user_service_timeout
+        self.api_key = settings.user_service_api_key
 
     @circuit(
         failure_threshold=5,
@@ -63,7 +64,10 @@ class UserServiceClient:
                 response = await client.get(
                     f"{self.base_url}/auth/user/{user_id}",
                     timeout=self.timeout,
-                    headers={"X-Correlation-ID": correlation_id},
+                    headers={
+                        "X-Correlation-ID": correlation_id,
+                        "X-API-Key": self.api_key,
+                    },
                 )
 
                 response.raise_for_status()
