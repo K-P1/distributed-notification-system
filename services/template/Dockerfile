@@ -34,6 +34,9 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 # Set working directory
 WORKDIR /app
 
+# Install uv for running commands
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
 
