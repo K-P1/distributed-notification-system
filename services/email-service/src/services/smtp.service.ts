@@ -21,7 +21,13 @@ export class SMTPService {
   ) {}
 
   async onModuleInit() {
-    await this.initializeTransporter();
+    // Don't block startup if SMTP connection fails
+    try {
+      await this.initializeTransporter();
+    } catch (error) {
+      this.logger.error('smtp_init_failed_non_blocking', error as Error);
+      // Continue startup even if SMTP fails
+    }
   }
 
   private async initializeTransporter(): Promise<void> {
@@ -39,9 +45,13 @@ export class SMTPService {
         maxMessages: 100,
       });
 
-      // Verify connection
+      // Verify connection (non-blocking)
       if (this.transporter) {
-        await this.transporter.verify();
+        this.transporter.verify().then(() => {
+          this.logger.info('smtp_connection_verified');
+        }).catch((error) => {
+          this.logger.warn('smtp_verification_failed', error);
+        });
       }
       this.logger.info('smtp_transporter_initialized');
     } catch (error) {
